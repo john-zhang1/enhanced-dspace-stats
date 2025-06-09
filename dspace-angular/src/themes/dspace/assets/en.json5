@@ -4,4 +4,15 @@
 
   // DSpace default: "DSpace Angular :: "
   "repository.title.prefix": "DSpace :: ",
+
+  "statistics.table.title.TotalNumberOfPageviews": "Total pageviews",
+  "statistics.table.title.TotalNumberOfDownloads": "Total downloads",
+  "statistics.table.title.TotalPageviewsPerMonth": "Total pageviews per month",
+  "statistics.table.title.TotalDownloadsPerMonth": "Total downloads per month",
+  "statistics.table.title.TopItemsPageviews": "Items with the most pageviews",
+  "statistics.table.title.TopItemsDownloads": "Items with the most downloads",
+  "statistics.table.title.TopCountriesPageviews": "Top pageviews by country",
+  "statistics.table.title.TopCountriesDownloads": "Top downloads by country",
+  "statistics.table.title.TopCitiesPageviews": "Top pageviews by city",
+  "statistics.table.title.TopCitiesDownloads": "Top downloads by city",
 }

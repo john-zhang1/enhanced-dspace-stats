@@ -1015,7 +1015,8 @@ public class SolrLoggerServiceImpl implements SolrLoggerService, InitializingBea
         return objCount;
     }
 
-    protected String getDateView(String name, String type, Context context) {
+    @Override
+    public String getDateView(String name, String type, Context context) {
         if (name != null && name.matches("^[0-9]{4}\\-[0-9]{2}.*")) {
             /*
              * if ("YEAR".equalsIgnoreCase(type)) return name.substring(0, 4);
@@ -1075,7 +1076,6 @@ public class SolrLoggerServiceImpl implements SolrLoggerService, InitializingBea
                                String dateStart, String dateEnd, List<String> facetQueries, String sort,
                                boolean ascending, int facetMinCount, boolean defaultFilterQueries)
             throws SolrServerException, IOException {
-
         if (solr == null) {
             return null;
         }

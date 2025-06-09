@@ -1561,10 +1561,14 @@ prevent the generation of resource policy entry values with null dspace_object a
 
     @Override
     public Item findByIdOrLegacyId(Context context, String id) throws SQLException {
-        if (StringUtils.isNumeric(id)) {
-            return findByLegacyId(context, Integer.parseInt(id));
+        if (id != null) {
+            if (StringUtils.isNumeric(id)) {
+                return findByLegacyId(context, Integer.parseInt(id));
+            } else {
+                return find(context, UUID.fromString(id));
+            }
         } else {
-            return find(context, UUID.fromString(id));
+            return null;
         }
     }
 

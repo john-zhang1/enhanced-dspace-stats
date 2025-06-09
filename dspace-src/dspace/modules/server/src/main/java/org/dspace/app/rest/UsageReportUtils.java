@@ -12,28 +12,43 @@ import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.Logger;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.response.FacetField;
+import org.apache.solr.client.solrj.response.QueryResponse;
+import org.apache.solr.client.solrj.response.RangeFacet;
 import org.dspace.app.rest.model.UsageReportPointCityRest;
 import org.dspace.app.rest.model.UsageReportPointCountryRest;
 import org.dspace.app.rest.model.UsageReportPointDateRest;
 import org.dspace.app.rest.model.UsageReportPointDsoTotalVisitsRest;
 import org.dspace.app.rest.model.UsageReportRest;
+import org.dspace.app.rest.repository.StatisticsRestRepository;
 import org.dspace.content.Bitstream;
+import org.dspace.content.Collection;
+import org.dspace.content.Community;
 import org.dspace.content.DSpaceObject;
+import org.dspace.content.DSpaceObjectLegacySupport;
 import org.dspace.content.Item;
 import org.dspace.content.Site;
+import org.dspace.content.factory.ContentServiceFactory;
+import org.dspace.content.service.ItemService;
 import org.dspace.core.Constants;
 import org.dspace.core.Context;
 import org.dspace.handle.service.HandleService;
 import org.dspace.statistics.Dataset;
+import org.dspace.statistics.ObjectCount;
 import org.dspace.statistics.content.DatasetDSpaceObjectGenerator;
 import org.dspace.statistics.content.DatasetTimeGenerator;
 import org.dspace.statistics.content.DatasetTypeGenerator;
 import org.dspace.statistics.content.StatisticsDataVisits;
 import org.dspace.statistics.content.StatisticsListing;
 import org.dspace.statistics.content.StatisticsTable;
+import org.dspace.statistics.factory.StatisticsServiceFactory;
+import org.dspace.statistics.service.SolrLoggerService;
+import org.dspace.statistics.util.LocationUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.stereotype.Component;
@@ -49,11 +64,25 @@ public class UsageReportUtils {
     @Autowired
     private HandleService handleService;
 
+    protected final SolrLoggerService solrLoggerService = StatisticsServiceFactory.getInstance().getSolrLoggerService();
+    protected transient final ItemService itemService = ContentServiceFactory.getInstance().getItemService();
+
     public static final String TOTAL_VISITS_REPORT_ID = "TotalVisits";
+    public static final String TOTAL_NUM_PAGEVIEWS_REPORT_ID = "TotalNumberOfPageviews";
+    public static final String TOTAL_NUM_DOWNLOADS_REPORT_ID = "TotalNumberOfDownloads";
     public static final String TOTAL_VISITS_PER_MONTH_REPORT_ID = "TotalVisitsPerMonth";
+    public static final String TOTAL_PAGEVIEWS_PER_MONTH_REPORT_ID = "TotalPageviewsPerMonth";
+    public static final String TOTAL_DOWNLOADS_PER_MONTH_REPORT_ID = "TotalDownloadsPerMonth";
     public static final String TOTAL_DOWNLOADS_REPORT_ID = "TotalDownloads";
     public static final String TOP_COUNTRIES_REPORT_ID = "TopCountries";
+    public static final String TOP_COUNTRIES_PAGEVIEWS_REPORT_ID = "TopCountriesPageviews";
+    public static final String TOP_COUNTRIES_DOWNLOADS_REPORT_ID = "TopCountriesDownloads";
     public static final String TOP_CITIES_REPORT_ID = "TopCities";
+    public static final String TOP_ITEMS_PAGEVIEWS_REPORT_ID = "TopItemsPageviews";
+    public static final String TOP_ITEMS_DOWNLOADS_REPORT_ID = "TopItemsDownloads";
+    public static final String TOP_CITIES_PAGEVIEWS_REPORT_ID = "TopCitiesPageviews";
+    public static final String TOP_CITIES_DOWNLOADS_REPORT_ID = "TopCitiesDownloads";
+
 
     /**
      * Get list of usage reports that are applicable to the DSO (of given UUID)
@@ -65,19 +94,32 @@ public class UsageReportUtils {
     public List<UsageReportRest> getUsageReportsOfDSO(Context context, DSpaceObject dso)
         throws SQLException, ParseException, SolrServerException, IOException {
         List<UsageReportRest> usageReports = new ArrayList<>();
-        if (dso instanceof Site) {
-            UsageReportRest globalUsageStats = this.resolveGlobalUsageReport(context);
-            globalUsageStats.setId(dso.getID().toString() + "_" + TOTAL_VISITS_REPORT_ID);
-            usageReports.add(globalUsageStats);
-        } else {
-            usageReports.add(this.createUsageReport(context, dso, TOTAL_VISITS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOTAL_VISITS_PER_MONTH_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_REPORT_ID));
+        if (dso instanceof Site || dso instanceof Community || dso instanceof Collection) {
+            usageReports.add(this.createUsageReport(context, dso, TOTAL_NUM_PAGEVIEWS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOTAL_NUM_DOWNLOADS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOTAL_PAGEVIEWS_PER_MONTH_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOTAL_DOWNLOADS_PER_MONTH_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOP_ITEMS_PAGEVIEWS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOP_ITEMS_DOWNLOADS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_PAGEVIEWS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_DOWNLOADS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_PAGEVIEWS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_DOWNLOADS_REPORT_ID));
         }
         if (dso instanceof Item || dso instanceof Bitstream) {
+            usageReports.add(this.createUsageReport(context, dso, TOTAL_NUM_PAGEVIEWS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOTAL_NUM_DOWNLOADS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOTAL_PAGEVIEWS_PER_MONTH_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOTAL_DOWNLOADS_PER_MONTH_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_PAGEVIEWS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_DOWNLOADS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_PAGEVIEWS_REPORT_ID));
+            usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_DOWNLOADS_REPORT_ID));
             usageReports.add(this.createUsageReport(context, dso, TOTAL_DOWNLOADS_REPORT_ID));
         }
+        // if (dso instanceof Item || dso instanceof Bitstream) {
+        //     usageReports.add(this.createUsageReport(context, dso, TOTAL_DOWNLOADS_REPORT_ID));
+        // }
         return usageReports;
     }
 
@@ -99,9 +141,25 @@ public class UsageReportUtils {
                     usageReportRest = resolveTotalVisits(context, dso);
                     usageReportRest.setReportType(TOTAL_VISITS_REPORT_ID);
                     break;
+                case TOTAL_NUM_PAGEVIEWS_REPORT_ID:
+                    usageReportRest = resolveTotalNumberOfPageviews(context, dso);
+                    usageReportRest.setReportType(TOTAL_NUM_PAGEVIEWS_REPORT_ID);
+                    break;
+                case TOTAL_NUM_DOWNLOADS_REPORT_ID:
+                    usageReportRest = resolveTotalNumberOfDownloads(context, dso);
+                    usageReportRest.setReportType(TOTAL_NUM_DOWNLOADS_REPORT_ID);
+                    break;
                 case TOTAL_VISITS_PER_MONTH_REPORT_ID:
                     usageReportRest = resolveTotalVisitsPerMonth(context, dso);
                     usageReportRest.setReportType(TOTAL_VISITS_PER_MONTH_REPORT_ID);
+                    break;
+                case TOTAL_PAGEVIEWS_PER_MONTH_REPORT_ID:
+                    usageReportRest = resolveTotalPageviewsPerMonth(context, dso);
+                    usageReportRest.setReportType(TOTAL_PAGEVIEWS_PER_MONTH_REPORT_ID);
+                    break;
+                case TOTAL_DOWNLOADS_PER_MONTH_REPORT_ID:
+                    usageReportRest = resolveTotalDownloadsPerMonth(context, dso);
+                    usageReportRest.setReportType(TOTAL_DOWNLOADS_PER_MONTH_REPORT_ID);
                     break;
                 case TOTAL_DOWNLOADS_REPORT_ID:
                     usageReportRest = resolveTotalDownloads(context, dso);
@@ -111,16 +169,40 @@ public class UsageReportUtils {
                     usageReportRest = resolveTopCountries(context, dso);
                     usageReportRest.setReportType(TOP_COUNTRIES_REPORT_ID);
                     break;
+                case TOP_COUNTRIES_PAGEVIEWS_REPORT_ID:
+                    usageReportRest = resolveTopCountriesPageviews(context, dso);
+                    usageReportRest.setReportType(TOP_COUNTRIES_PAGEVIEWS_REPORT_ID);
+                    break;
+                case TOP_COUNTRIES_DOWNLOADS_REPORT_ID:
+                    usageReportRest = resolveTopCountriesDownloads(context, dso);
+                    usageReportRest.setReportType(TOP_COUNTRIES_DOWNLOADS_REPORT_ID);
+                    break;
                 case TOP_CITIES_REPORT_ID:
                     usageReportRest = resolveTopCities(context, dso);
                     usageReportRest.setReportType(TOP_CITIES_REPORT_ID);
+                    break;
+                case TOP_ITEMS_PAGEVIEWS_REPORT_ID:
+                    usageReportRest = resolveTopItemsPageviewsReport(context, dso);
+                    usageReportRest.setReportType(TOP_ITEMS_PAGEVIEWS_REPORT_ID);
+                    break;
+                case TOP_ITEMS_DOWNLOADS_REPORT_ID:
+                    usageReportRest = resolveTopItemsDownloadsReport(context, dso);
+                    usageReportRest.setReportType(TOP_ITEMS_DOWNLOADS_REPORT_ID);
+                    break;
+                case TOP_CITIES_PAGEVIEWS_REPORT_ID:
+                    usageReportRest = resolveTopCitiesPageviews(context, dso);
+                    usageReportRest.setReportType(TOP_CITIES_PAGEVIEWS_REPORT_ID);
+                    break;
+                case TOP_CITIES_DOWNLOADS_REPORT_ID:
+                    usageReportRest = resolveTopCitiesDownloads(context, dso);
+                    usageReportRest.setReportType(TOP_CITIES_DOWNLOADS_REPORT_ID);
                     break;
                 default:
                     throw new ResourceNotFoundException("The given report id can't be resolved: " + reportId + "; " +
                                                         "available reports: TotalVisits, TotalVisitsPerMonth, " +
                                                         "TotalDownloads, TopCountries, TopCities");
             }
-            usageReportRest.setId(dso.getID() + "_" + reportId);
+            usageReportRest.setId(dso.getID().toString() + "_" +  reportId);
             return usageReportRest;
         } catch (SQLException e) {
             throw new SolrServerException("SQLException trying to receive statistics of: " + dso.getID());
@@ -135,13 +217,13 @@ public class UsageReportUtils {
      */
     private UsageReportRest resolveGlobalUsageReport(Context context)
         throws SQLException, IOException, ParseException, SolrServerException {
-        StatisticsListing statListing = new StatisticsListing(
-            new StatisticsDataVisits());
+        StatisticsListing statListing = new StatisticsListing(new StatisticsDataVisits());
 
         // Adding a new generator for our top 10 items without a name length delimiter
         DatasetDSpaceObjectGenerator dsoAxis = new DatasetDSpaceObjectGenerator();
         // TODO make max nr of top items (views wise)? Must be set
         dsoAxis.addDsoChild(Constants.ITEM, 10, false, -1);
+        dsoAxis.setIncludeTotal(true);
         statListing.addDatasetGenerator(dsoAxis);
 
         Dataset dataset = statListing.getDataset(context, 1);
@@ -163,6 +245,152 @@ public class UsageReportUtils {
             }
         }
         usageReportRest.setReportType(TOTAL_VISITS_REPORT_ID);
+        return usageReportRest;
+    }
+
+    private UsageReportRest resolveTopItemsPageviewsReport(Context context, DSpaceObject dso)
+        throws SQLException, IOException, ParseException, SolrServerException {
+        StatisticsListing statListing = new StatisticsListing(new StatisticsDataVisits(dso));
+        // Adding a new generator for our top 10 items without a name length delimiter
+        DatasetDSpaceObjectGenerator dsoAxis = new DatasetDSpaceObjectGenerator();
+        dsoAxis.addDsoChild(Constants.ITEM, 10, false, -1);
+        dsoAxis.setIncludeTotal(true);
+        statListing.addDatasetGenerator(dsoAxis);
+        Dataset dataset = statListing.getDataset(context, 1);
+        UsageReportRest usageReportRest = new UsageReportRest();
+
+        for (int i = 0; i < dataset.getColLabels().size(); i++) {
+            UsageReportPointDsoTotalVisitsRest totalVisitPoint = new UsageReportPointDsoTotalVisitsRest();
+
+            totalVisitPoint.setType("item");
+            String urlOfItem = dataset.getColLabelsAttrs().get(i).get("url");
+
+            if (urlOfItem != null) {
+                String handle = StringUtils.substringAfterLast(urlOfItem, "handle/");
+
+                if (handle != null) {
+                    DSpaceObject dsoItem = handleService.resolveToObject(context, handle);
+                    totalVisitPoint.setId(dsoItem != null ? dsoItem.getID().toString() : urlOfItem);
+                    totalVisitPoint.setLabel(dsoItem != null ? dsoItem.getName() : urlOfItem);
+                    totalVisitPoint.addValue("views", Integer.valueOf(dataset.getMatrix()[0][i]));
+                    usageReportRest.addPoint(totalVisitPoint);
+                }
+            }
+        }
+        usageReportRest.setReportType(TOP_ITEMS_PAGEVIEWS_REPORT_ID);
+        return usageReportRest;
+    }
+
+    private UsageReportRest resolveTopItemsDownloadsReport(Context context, DSpaceObject dso)
+        throws SQLException, IOException, ParseException, SolrServerException {
+
+        String query = "type:0";
+        if (dso instanceof org.dspace.content.Site) {
+            query += "";
+        } else if (dso instanceof org.dspace.content.Community) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningComm:" + dso.getID() + " OR owningComm:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningComm:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Collection) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningColl:" + dso.getID() + " OR owningColl:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningColl:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Item) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningItem:" + dso.getID() + " OR owningItem:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningItem:" + dso.getID();
+            }
+        }
+
+        String filterQuery = "-isBot:true AND -(statistics_type:[* TO *] AND -statistics_type:view) AND -(bundleName:[* TO *] AND -bundleName:ORIGINAL)";
+        QueryResponse response = solrLoggerService.query(query, filterQuery, "owningItem", 0, 10, null, null, null, null, null, false, 1, true);
+        UsageReportRest usageReportRest = new UsageReportRest();
+        List<FacetField> fieldFacets = (List<FacetField>) response.getFacetFields();
+
+        for (FacetField fieldFacet: fieldFacets) {
+            if (fieldFacet.getName().equalsIgnoreCase("owningItem")) {
+                for (int i = 0; i < fieldFacet.getValues().size(); i++) {
+                    UsageReportPointDsoTotalVisitsRest totalVisitPoint = new UsageReportPointDsoTotalVisitsRest();
+                    totalVisitPoint.setType("item");
+                    totalVisitPoint.setId(fieldFacet.getValues().get(i).getName());
+                    totalVisitPoint.setLabel(getItemTitle(fieldFacet.getValues().get(i).getName(), context));
+                    totalVisitPoint.addValue("views", (int) fieldFacet.getValues().get(i).getCount());
+                    usageReportRest.addPoint(totalVisitPoint);
+                }
+            }
+        }
+
+        usageReportRest.setReportType(TOP_ITEMS_DOWNLOADS_REPORT_ID);
+        return usageReportRest;
+    }
+    public long getTotalNumberOfPageviews(DSpaceObject dso) throws SolrServerException, IOException {
+        String dsoid = dso.getID().toString();
+        String filterQuery = "-isBot:true AND -(statistics_type:[* TO *] AND -statistics_type:view)";
+        String query = "";
+        int facetMinCount = 1;
+
+        if (dso instanceof org.dspace.content.Site) {
+            query = "type:2";
+        } else if (dso instanceof org.dspace.content.Community) {
+            query = "type:2 AND owningComm:" + dsoid;
+        } else if (dso instanceof org.dspace.content.Collection) {
+            query = "type:2 AND owningColl:" + dsoid;
+        } else if (dso instanceof org.dspace.content.Item) {
+            query = "type:2 AND id:" + dsoid;
+        }
+
+        return solrLoggerService.queryTotal(query, filterQuery, facetMinCount).getCount();
+    }
+
+    public long getTotalNumberOfDownloads(DSpaceObject dso) throws SolrServerException, IOException {
+        String dsoid = dso.getID().toString();
+        int facetMinCount = 1;
+        String query = "";
+        String filterQuery = "-isBot:true AND -(bundleName:[* TO *]-bundleName:ORIGINAL) AND -(statistics_type:[* TO *] AND -statistics_type:view)";
+
+        if (dso instanceof org.dspace.content.Site) {
+            query = "type: 0";
+        } else if (dso instanceof org.dspace.content.Community) {
+            query = "type: 0 AND owningComm:" + dsoid;
+        } else if (dso instanceof org.dspace.content.Collection) {
+            query = "type: 0 AND owningColl:" + dsoid;
+        } else if (dso instanceof org.dspace.content.Item) {
+            query = "type: 0 AND owningItem:" + dsoid;
+        }
+
+        return solrLoggerService.queryTotal(query, filterQuery, facetMinCount).getCount();
+    }
+
+    private UsageReportRest resolveTotalNumberOfPageviews(Context context, DSpaceObject dso)
+        throws SQLException, IOException, ParseException, SolrServerException {
+
+        UsageReportRest usageReportRest = new UsageReportRest();
+        UsageReportPointDsoTotalVisitsRest totalVisitPoint = new UsageReportPointDsoTotalVisitsRest();
+        totalVisitPoint.setType("item");
+        totalVisitPoint.setId(dso.getID().toString());
+        totalVisitPoint.setLabel(dso.getName());
+        totalVisitPoint.addValue("views", (int) getTotalNumberOfPageviews(dso));
+        usageReportRest.addPoint(totalVisitPoint);
+        usageReportRest.setReportType(TOTAL_NUM_PAGEVIEWS_REPORT_ID);
+        return usageReportRest;
+    }
+
+    private UsageReportRest resolveTotalNumberOfDownloads(Context context, DSpaceObject dso)
+        throws SQLException, IOException, ParseException, SolrServerException {
+
+        UsageReportRest usageReportRest = new UsageReportRest();
+        UsageReportPointDsoTotalVisitsRest totalVisitPoint = new UsageReportPointDsoTotalVisitsRest();
+        totalVisitPoint.setType("item");
+        totalVisitPoint.setId(dso.getID().toString());
+        totalVisitPoint.setLabel(dso.getName());
+        totalVisitPoint.addValue("views", (int) getTotalNumberOfDownloads(dso));
+        usageReportRest.addPoint(totalVisitPoint);
+        usageReportRest.setReportType(TOTAL_NUM_DOWNLOADS_REPORT_ID);
         return usageReportRest;
     }
 
@@ -222,6 +450,106 @@ public class UsageReportUtils {
             monthPoint.addValue("views", Integer.valueOf(dataset.getMatrix()[0][i]));
             usageReportRest.addPoint(monthPoint);
         }
+        return usageReportRest;
+    }
+
+    private UsageReportRest resolveTotalPageviewsPerMonth(Context context, DSpaceObject dso)
+        throws SQLException, IOException, ParseException, SolrServerException {
+
+        String query = "type:2";
+        if (dso instanceof org.dspace.content.Site) {
+            query += "";
+        } else if (dso instanceof org.dspace.content.Community) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningComm:" + dso.getID() + " OR owningComm:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningComm:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Collection) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningColl:" + dso.getID() + " OR owningColl:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningColl:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Item) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(id:" + dso.getID() + " OR id:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND id:" + dso.getID();
+            }
+        }
+
+        String filterQuery = "-isBot:true AND -(statistics_type:[* TO *] AND -statistics_type:view)";
+        QueryResponse response = solrLoggerService.query(query, filterQuery, null, 0, 10, "MONTH", "-6", "+1", null, null, false, 0, true);
+        UsageReportRest usageReportRest = new UsageReportRest();
+        List<RangeFacet> rangeFacets = response.getFacetRanges();
+        for (RangeFacet rangeFacet: rangeFacets) {
+            if (rangeFacet.getName().equalsIgnoreCase("time")) {
+                RangeFacet timeFacet = rangeFacet;
+                ObjectCount[] result = new ObjectCount[timeFacet.getCounts().size() + 1];
+                for (int i = 0; i < timeFacet.getCounts().size(); i++) {
+                    RangeFacet.Count dateCount = (RangeFacet.Count) timeFacet.getCounts().get(i);
+                    result[i] = new ObjectCount();
+                    result[i].setCount(dateCount.getCount());
+                    result[i].setValue(solrLoggerService.getDateView(dateCount.getValue(), "MONTH", context));
+
+                    UsageReportPointDateRest monthPoint = new UsageReportPointDateRest();
+                    monthPoint.setId(result[i].getValue());
+                    monthPoint.addValue("views", (int)result[i].getCount());
+                    usageReportRest.addPoint(monthPoint);
+                }
+                result[result.length - 1] = new ObjectCount();
+                result[result.length - 1].setCount(response.getResults().getNumFound());
+                result[result.length - 1].setValue("total");
+            }
+        }
+
+        return usageReportRest;
+    }
+    private UsageReportRest resolveTotalDownloadsPerMonth(Context context, DSpaceObject dso)
+        throws SQLException, IOException, ParseException, SolrServerException {
+
+        String query = "type:0";
+        if (dso instanceof org.dspace.content.Site) {
+            query += "";
+        } else if (dso instanceof org.dspace.content.Community) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningComm:" + dso.getID() + " OR owningComm:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningComm:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Collection) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningColl:" + dso.getID() + " OR owningColl:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningColl:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Item) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningItem:" + dso.getID() + " OR owningItem:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningItem:" + dso.getID();
+            }
+        }
+
+        String filterQuery = "-isBot:true AND -(statistics_type:[* TO *] AND -statistics_type:view) AND -(bundleName:[* TO *] AND -bundleName:ORIGINAL)";
+        QueryResponse response = solrLoggerService.query(query, filterQuery, null, 0, 10, "MONTH", "-6", "+1", null, null, false, 0, true);
+        UsageReportRest usageReportRest = new UsageReportRest();
+        List<RangeFacet> rangeFacets = response.getFacetRanges();
+        for (RangeFacet rangeFacet: rangeFacets) {
+            if (rangeFacet.getName().equalsIgnoreCase("time")) {
+                RangeFacet timeFacet = rangeFacet;
+                // ObjectCount[] result = new ObjectCount[timeFacet.getCounts().size() + 1];
+                for (int i = 0; i < timeFacet.getCounts().size(); i++) {
+                    RangeFacet.Count dateCount = (RangeFacet.Count) timeFacet.getCounts().get(i);
+                    UsageReportPointDateRest monthPoint = new UsageReportPointDateRest();
+                    monthPoint.setId(solrLoggerService.getDateView(dateCount.getValue(), "MONTH", context));
+                    monthPoint.addValue("views", dateCount.getCount());
+                    usageReportRest.addPoint(monthPoint);
+                }
+            }
+        }
+
         return usageReportRest;
     }
 
@@ -287,6 +615,100 @@ public class UsageReportUtils {
         return usageReportRest;
     }
 
+    private UsageReportRest resolveTopCountriesPageviews(Context context, DSpaceObject dso)
+        throws SQLException, IOException, ParseException, SolrServerException {
+
+        String query = "type:2";
+        if (dso instanceof org.dspace.content.Site) {
+            query += "";
+        } else if (dso instanceof org.dspace.content.Community) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningComm:" + dso.getID() + " OR owningComm:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningComm:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Collection) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningColl:" + dso.getID() + " OR owningColl:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningColl:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Item) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(id:" + dso.getID() + " OR id:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND id:" + dso.getID();
+            }
+        }
+
+        String filterQuery = "-isBot:true AND -(statistics_type:[* TO *] AND -statistics_type:view)";
+        QueryResponse response = solrLoggerService.query(query, filterQuery, "countryCode", 0, -1, null, null, null, null, null, false, 1, false);
+        UsageReportRest usageReportRest = new UsageReportRest();
+        List<FacetField> fieldFacets = (List<FacetField>) response.getFacetFields();
+
+        for (FacetField fieldFacet: fieldFacets) {
+            if (fieldFacet.getName().equalsIgnoreCase("countryCode")) {
+                for (int i = 0; i < fieldFacet.getValues().size(); i++) {
+                    UsageReportPointCountryRest countryPoint = new UsageReportPointCountryRest();
+                    countryPoint.setId(fieldFacet.getValues().get(i).getName());
+                    countryPoint.setLabel(LocationUtils.getCountryName(fieldFacet.getValues().get(i).getName(), context.getCurrentLocale()));
+                    countryPoint.addValue("views", (int) fieldFacet.getValues().get(i).getCount());
+                    usageReportRest.addPoint(countryPoint);
+                }
+            }
+        }
+
+        usageReportRest.setReportType(TOP_COUNTRIES_PAGEVIEWS_REPORT_ID);
+        return usageReportRest;
+    }
+
+    private UsageReportRest resolveTopCountriesDownloads(Context context, DSpaceObject dso)
+        throws SQLException, IOException, ParseException, SolrServerException {
+
+        String query = "type:0";
+        if (dso instanceof org.dspace.content.Site) {
+            query += "";
+        } else if (dso instanceof org.dspace.content.Community) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningComm:" + dso.getID() + " OR owningComm:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningComm:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Collection) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningColl:" + dso.getID() + " OR owningColl:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningColl:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Item) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningItem:" + dso.getID() + " OR owningItem:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningItem:" + dso.getID();
+            }
+        }
+
+        String filterQuery = "-isBot:true AND -(statistics_type:[* TO *] AND -statistics_type:view) AND -(bundleName:[* TO *] AND -bundleName:ORIGINAL)";
+        QueryResponse response = solrLoggerService.query(query, filterQuery, "countryCode", 0, -1, null, null, null, null, null, false, 1, false);
+        UsageReportRest usageReportRest = new UsageReportRest();
+        List<FacetField> fieldFacets = (List<FacetField>) response.getFacetFields();
+
+        for (FacetField fieldFacet: fieldFacets) {
+            if (fieldFacet.getName().equalsIgnoreCase("countryCode")) {
+                for (int i = 0; i < fieldFacet.getValues().size(); i++) {
+                    UsageReportPointCountryRest countryPoint = new UsageReportPointCountryRest();
+                    countryPoint.setId(fieldFacet.getValues().get(i).getName());
+                    countryPoint.setLabel(LocationUtils.getCountryName(fieldFacet.getValues().get(i).getName(), context.getCurrentLocale()));
+                    countryPoint.addValue("views", (int) fieldFacet.getValues().get(i).getCount());
+                    usageReportRest.addPoint(countryPoint);
+                }
+            }
+        }
+
+        usageReportRest.setReportType(TOP_COUNTRIES_DOWNLOADS_REPORT_ID);
+        return usageReportRest;
+    }
+
     /**
      * Create a stat usage report for the TopCities that have visited the given DSO. If there have been no visits, or
      * no visits with a valid Geolite determined city (based on IP), this report contains an empty list of points=[].
@@ -311,6 +733,100 @@ public class UsageReportUtils {
         return usageReportRest;
     }
 
+    private UsageReportRest resolveTopCitiesPageviews(Context context, DSpaceObject dso)
+        throws SQLException, IOException, ParseException, SolrServerException {
+
+        String query = "type:2";
+        if (dso instanceof org.dspace.content.Site) {
+            query += "";
+        } else if (dso instanceof org.dspace.content.Community) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningComm:" + dso.getID() + " OR owningComm:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningComm:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Collection) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningColl:" + dso.getID() + " OR owningColl:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningColl:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Item) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(id:" + dso.getID() + " OR id:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND id:" + dso.getID();
+            }
+        }
+
+        String filterQuery = "-isBot:true AND -(statistics_type:[* TO *] AND -statistics_type:view)";
+        QueryResponse response = solrLoggerService.query(query, filterQuery, "city", 0, -1, null, null, null, null, null, false, 1, false);
+        UsageReportRest usageReportRest = new UsageReportRest();
+        List<FacetField> fieldFacets = (List<FacetField>) response.getFacetFields();
+
+        for (FacetField fieldFacet: fieldFacets) {
+            if (fieldFacet.getName().equalsIgnoreCase("city")) {
+                for (int i = 0; i < fieldFacet.getValues().size(); i++) {
+                    UsageReportPointCountryRest cityPoint = new UsageReportPointCountryRest();
+                    cityPoint.setId(fieldFacet.getValues().get(i).getName());
+                    cityPoint.setLabel(LocationUtils.getCountryName(fieldFacet.getValues().get(i).getName(), context.getCurrentLocale()));
+                    cityPoint.addValue("views", (int) fieldFacet.getValues().get(i).getCount());
+                    usageReportRest.addPoint(cityPoint);
+                }
+            }
+        }
+
+        usageReportRest.setReportType(TOP_CITIES_PAGEVIEWS_REPORT_ID);
+        return usageReportRest;
+    }
+
+    private UsageReportRest resolveTopCitiesDownloads(Context context, DSpaceObject dso)
+        throws SQLException, IOException, ParseException, SolrServerException {
+
+        String query = "type:0";
+        if (dso instanceof org.dspace.content.Site) {
+            query += "";
+        } else if (dso instanceof org.dspace.content.Community) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningComm:" + dso.getID() + " OR owningComm:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningComm:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Collection) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningColl:" + dso.getID() + " OR owningColl:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningColl:" + dso.getID();
+            }
+        } else if (dso instanceof org.dspace.content.Item) {
+            if (dso instanceof DSpaceObjectLegacySupport) {
+                query += " AND +(owningItem:" + dso.getID() + " OR owningItem:" + ((DSpaceObjectLegacySupport) dso).getLegacyId() + ")";
+            } else {
+                query += " AND owningItem:" + dso.getID();
+            }
+        }
+
+        String filterQuery = "-isBot:true AND -(statistics_type:[* TO *] AND -statistics_type:view) AND -(bundleName:[* TO *] AND -bundleName:ORIGINAL)";
+        QueryResponse response = solrLoggerService.query(query, filterQuery, "city", 0, -1, null, null, null, null, null, false, 1, false);
+        UsageReportRest usageReportRest = new UsageReportRest();
+        List<FacetField> fieldFacets = (List<FacetField>) response.getFacetFields();
+
+        for (FacetField fieldFacet: fieldFacets) {
+            if (fieldFacet.getName().equalsIgnoreCase("city")) {
+                for (int i = 0; i < fieldFacet.getValues().size(); i++) {
+                    UsageReportPointCountryRest countryPoint = new UsageReportPointCountryRest();
+                    countryPoint.setId(fieldFacet.getValues().get(i).getName());
+                    countryPoint.setLabel(LocationUtils.getCountryName(fieldFacet.getValues().get(i).getName(), context.getCurrentLocale()));
+                    countryPoint.addValue("views", (int) fieldFacet.getValues().get(i).getCount());
+                    usageReportRest.addPoint(countryPoint);
+                }
+            }
+        }
+
+        usageReportRest.setReportType(TOP_CITIES_DOWNLOADS_REPORT_ID);
+        return usageReportRest;
+    }
+
     /**
      * Retrieves the stats dataset of a given DSO, of given type, with a given facetMinCount limit (usually either 0
      * or 1, 0 if we want a data point even though the facet data point has 0 matching results).
@@ -325,7 +841,7 @@ public class UsageReportUtils {
         throws SQLException, IOException, ParseException, SolrServerException {
         StatisticsListing statsList = new StatisticsListing(new StatisticsDataVisits(dso));
         DatasetDSpaceObjectGenerator dsoAxis = new DatasetDSpaceObjectGenerator();
-        dsoAxis.addDsoChild(dsoType, 10, false, -1);
+        dsoAxis.addDsoChild(dsoType, 10, true, -1);
         statsList.addDatasetGenerator(dsoAxis);
         return statsList.getDataset(context, facetMinCount);
     }
@@ -351,5 +867,28 @@ public class UsageReportUtils {
         typeAxis.setMax(100);
         statListing.addDatasetGenerator(typeAxis);
         return statListing.getDataset(context, facetMinCount);
+    }
+
+    private String getItemTitle(String id, Context context) throws SQLException {
+        String itemTitle = null;
+        String dsoId = null;
+        try {
+            dsoId = UUID.fromString(id).toString();
+        } catch (Exception e) {
+            try {
+                dsoId = String.valueOf(Integer.parseInt(id));
+            } catch (NumberFormatException e1) {
+                dsoId = null;
+            }
+        }
+        Item item = itemService.findByIdOrLegacyId(context, dsoId);
+        if (item != null) {
+            String title = itemService.getMetadataFirstValue(item, "dc", "title", null, Item.ANY);
+            if (title != null) {
+                itemTitle = title;
+            }
+        }
+
+        return itemTitle;
     }
 }

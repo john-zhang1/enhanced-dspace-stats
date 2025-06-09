@@ -82,6 +82,7 @@ public class StatisticsDataVisits extends StatisticsData {
     protected final ConfigurationService configurationService
             = DSpaceServicesFactory.getInstance().getConfigurationService();
 
+
     /**
      * Construct a completely uninitialized query.
      */
@@ -136,7 +137,6 @@ public class StatisticsDataVisits extends StatisticsData {
             DatasetGenerator dataSet = getDatasetGenerators().get(i);
             processAxis(context, dataSet, datasetQueries);
         }
-
         // Now lets determine our values.
         // First check if we have a date facet & if so find it.
         DatasetTimeGenerator dateFacet = null;
@@ -196,9 +196,6 @@ public class StatisticsDataVisits extends StatisticsData {
         //Solr doesn't explicitly apply boolean logic, so this query cannot be simplified to an OR query
         filterQuery += "-(statistics_type:[* TO *] AND -statistics_type:" + SolrLoggerServiceImpl.StatisticsType.VIEW
             .text() + ")";
-
-
-//        System.out.println("FILTERQUERY: " + filterQuery);
 
         // We determine our values on the queries resolved above
         Dataset dataset = null;
@@ -380,9 +377,6 @@ public class StatisticsDataVisits extends StatisticsData {
                     }
                     */
                 }
-
-//                System.out.println("BOTH");
-
             } else {
                 // Make sure we have a dataSet
                 dataset = new Dataset(1, topCounts1.length);
@@ -847,6 +841,7 @@ public class StatisticsDataVisits extends StatisticsData {
                     default:
                         break;
                 }
+
                 if (currentDso instanceof DSpaceObjectLegacySupport) {
                     owningStr = "(" + owningStr + ":" + currentDso.getID() + " OR "
                         + owningStr + ":" + ((DSpaceObjectLegacySupport) currentDso).getLegacyId() + ")";
@@ -855,6 +850,10 @@ public class StatisticsDataVisits extends StatisticsData {
                 }
 
                 query += owningStr;
+
+                if (currentDso.getType() == Constants.SITE) {
+                    query = "type: " + dsoType;
+                }
             }
 
             if (query.equals("")) {
@@ -864,5 +863,4 @@ public class StatisticsDataVisits extends StatisticsData {
             return query;
         }
     }
-
 }

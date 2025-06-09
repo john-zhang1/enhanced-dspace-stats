@@ -12,5 +12,16 @@ import { ItemStatisticsPageComponent as BaseComponent } from '../../../../../app
 /**
  * Component representing the statistics page for an item.
  */
-export class ItemStatisticsPageComponent extends BaseComponent {}
+export class ItemStatisticsPageComponent extends BaseComponent {
+      types: string[] = [
+      'TotalNumberOfPageviews',
+      'TotalNumberOfDownloads',
+      'TotalPageviewsPerMonth',
+      'TotalDownloadsPerMonth',
+      'TopCountriesPageviews',
+      'TopCountriesDownloads',
+      'TopCitiesPageviews',
+      'TopCitiesDownloads',
+    ];
+}
 

@@ -12,5 +12,19 @@ import { CollectionStatisticsPageComponent as BaseComponent } from '../../../../
 /**
  * Component representing the statistics page for a collection.
  */
-export class CollectionStatisticsPageComponent extends BaseComponent {}
+export class CollectionStatisticsPageComponent extends BaseComponent {
+
+    types: string[] = [
+      'TotalNumberOfPageviews',
+      'TotalNumberOfDownloads',
+      'TotalPageviewsPerMonth',
+      'TotalDownloadsPerMonth',
+      'TopItemsPageviews',
+      'TopItemsDownloads',
+      'TopCountriesPageviews',
+      'TopCountriesDownloads',
+      'TopCitiesPageviews',
+      'TopCitiesDownloads',
+    ];
+}
 

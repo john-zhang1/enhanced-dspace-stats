@@ -12,5 +12,18 @@ import { CommunityStatisticsPageComponent as BaseComponent } from '../../../../.
 /**
  * Component representing the statistics page for a community.
  */
-export class CommunityStatisticsPageComponent extends BaseComponent {}
+export class CommunityStatisticsPageComponent extends BaseComponent {
+      types: string[] = [
+      'TotalNumberOfPageviews',
+      'TotalNumberOfDownloads',
+      'TotalPageviewsPerMonth',
+      'TotalDownloadsPerMonth',
+      'TopItemsPageviews',
+      'TopItemsDownloads',
+      'TopCountriesPageviews',
+      'TopCountriesDownloads',
+      'TopCitiesPageviews',
+      'TopCitiesDownloads',
+    ];
+}
 

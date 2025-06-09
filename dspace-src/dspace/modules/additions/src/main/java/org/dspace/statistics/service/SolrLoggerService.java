@@ -296,4 +296,5 @@ public interface SolrLoggerService {
      */
     public Object anonymizeIp(String ip) throws UnknownHostException;
 
+    public String getDateView(String name, String type, Context context);
 }
