@@ -45,7 +45,7 @@ These enhancements allow stakeholders to track usage trends, discover geographic
    - Frontend (Angular): Replace/update component files in `dspace-angular`.
 
 3. **Use textual version or graphical version:**
-   - Add parameter `useStatsCharts: true` to config.prod.yml for graphical version
+   - Add property `useStatsCharts: true` to config.prod.yml for graphical version
    - By default the textual version is used.
 
 4. **Rebuild your DSpace environment**
@@ -69,7 +69,7 @@ These enhancements allow stakeholders to track usage trends, discover geographic
 ![Pageviews per month Statistics](screenshots/viewspermonth.png)
 ![Downloads by country map Statistics](screenshots/downloadsbycountrym.png)
 ![Downloads by country](screenshots/downloadsbycountryt.png)
-![Items with most downloads](screenshots/itemswithmostviews.png)
+![Items with most downloads](screenshots/itemswithmostdownloads.png)
 
 ⸻
 
