@@ -1,0 +1,38 @@
+<div class="container">
+
+  <ng-container *ngVar="(scope$ | async) as scope">
+    <h1 *ngIf="scope"
+        class="header"
+        id="{{ scope.id }}">
+      {{ 'statistics.header' | translate: { scope: getName(scope) } }}
+    </h1>
+  </ng-container>
+
+  <ng-container *ngVar="reports$ | async as reports">
+    <ng-container *ngIf="!reports">
+      <ds-themed-loading></ds-themed-loading>
+    </ng-container>
+
+    <ng-container *ngIf="reports">
+
+      <div *ngIf="useStatsCharts; else useTables">
+        <div *ngVar="(scope$ | async) as scope">
+          <ds-statistics-chart [reports]="reports" [scope]="scope"></ds-statistics-chart>
+        </div>
+      </div>
+
+      <ng-template #useTables>
+        <ds-statistics-table *ngFor="let report of reports"
+                            [report]="report"
+                            class="m-2 {{ report.id }}">
+        </ds-statistics-table>
+      </ng-template>
+
+      <div *ngIf="!(hasData$ | async)">
+        {{ 'statistics.page.no-data' | translate }}
+      </div>
+    </ng-container>
+
+  </ng-container>
+
+</div>

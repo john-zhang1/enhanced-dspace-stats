@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.Logger;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.FacetField;
 import org.apache.solr.client.solrj.response.QueryResponse;
@@ -25,7 +24,6 @@ import org.dspace.app.rest.model.UsageReportPointCountryRest;
 import org.dspace.app.rest.model.UsageReportPointDateRest;
 import org.dspace.app.rest.model.UsageReportPointDsoTotalVisitsRest;
 import org.dspace.app.rest.model.UsageReportRest;
-import org.dspace.app.rest.repository.StatisticsRestRepository;
 import org.dspace.content.Bitstream;
 import org.dspace.content.Collection;
 import org.dspace.content.Community;
@@ -94,32 +92,24 @@ public class UsageReportUtils {
     public List<UsageReportRest> getUsageReportsOfDSO(Context context, DSpaceObject dso)
         throws SQLException, ParseException, SolrServerException, IOException {
         List<UsageReportRest> usageReports = new ArrayList<>();
+
+        usageReports.add(this.createUsageReport(context, dso, TOTAL_NUM_PAGEVIEWS_REPORT_ID));
+        usageReports.add(this.createUsageReport(context, dso, TOTAL_NUM_DOWNLOADS_REPORT_ID));
+        usageReports.add(this.createUsageReport(context, dso, TOTAL_PAGEVIEWS_PER_MONTH_REPORT_ID));
+        usageReports.add(this.createUsageReport(context, dso, TOTAL_DOWNLOADS_PER_MONTH_REPORT_ID));
+        usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_PAGEVIEWS_REPORT_ID));
+        usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_DOWNLOADS_REPORT_ID));
+        usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_PAGEVIEWS_REPORT_ID));
+        usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_DOWNLOADS_REPORT_ID));
+
         if (dso instanceof Site || dso instanceof Community || dso instanceof Collection) {
-            usageReports.add(this.createUsageReport(context, dso, TOTAL_NUM_PAGEVIEWS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOTAL_NUM_DOWNLOADS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOTAL_PAGEVIEWS_PER_MONTH_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOTAL_DOWNLOADS_PER_MONTH_REPORT_ID));
             usageReports.add(this.createUsageReport(context, dso, TOP_ITEMS_PAGEVIEWS_REPORT_ID));
             usageReports.add(this.createUsageReport(context, dso, TOP_ITEMS_DOWNLOADS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_PAGEVIEWS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_DOWNLOADS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_PAGEVIEWS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_DOWNLOADS_REPORT_ID));
         }
         if (dso instanceof Item || dso instanceof Bitstream) {
-            usageReports.add(this.createUsageReport(context, dso, TOTAL_NUM_PAGEVIEWS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOTAL_NUM_DOWNLOADS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOTAL_PAGEVIEWS_PER_MONTH_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOTAL_DOWNLOADS_PER_MONTH_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_PAGEVIEWS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOP_COUNTRIES_DOWNLOADS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_PAGEVIEWS_REPORT_ID));
-            usageReports.add(this.createUsageReport(context, dso, TOP_CITIES_DOWNLOADS_REPORT_ID));
             usageReports.add(this.createUsageReport(context, dso, TOTAL_DOWNLOADS_REPORT_ID));
         }
-        // if (dso instanceof Item || dso instanceof Bitstream) {
-        //     usageReports.add(this.createUsageReport(context, dso, TOTAL_DOWNLOADS_REPORT_ID));
-        // }
+
         return usageReports;
     }
 
@@ -209,45 +199,6 @@ public class UsageReportUtils {
         }
     }
 
-    /**
-     * Create stat usage report of the items most popular over entire site
-     *
-     * @param context DSpace context
-     * @return Usage report with top most popular items
-     */
-    private UsageReportRest resolveGlobalUsageReport(Context context)
-        throws SQLException, IOException, ParseException, SolrServerException {
-        StatisticsListing statListing = new StatisticsListing(new StatisticsDataVisits());
-
-        // Adding a new generator for our top 10 items without a name length delimiter
-        DatasetDSpaceObjectGenerator dsoAxis = new DatasetDSpaceObjectGenerator();
-        // TODO make max nr of top items (views wise)? Must be set
-        dsoAxis.addDsoChild(Constants.ITEM, 10, false, -1);
-        dsoAxis.setIncludeTotal(true);
-        statListing.addDatasetGenerator(dsoAxis);
-
-        Dataset dataset = statListing.getDataset(context, 1);
-
-        UsageReportRest usageReportRest = new UsageReportRest();
-        for (int i = 0; i < dataset.getColLabels().size(); i++) {
-            UsageReportPointDsoTotalVisitsRest totalVisitPoint = new UsageReportPointDsoTotalVisitsRest();
-            totalVisitPoint.setType("item");
-            String urlOfItem = dataset.getColLabelsAttrs().get(i).get("url");
-            if (urlOfItem != null) {
-                String handle = StringUtils.substringAfterLast(urlOfItem, "handle/");
-                if (handle != null) {
-                    DSpaceObject dso = handleService.resolveToObject(context, handle);
-                    totalVisitPoint.setId(dso != null ? dso.getID().toString() : urlOfItem);
-                    totalVisitPoint.setLabel(dso != null ? dso.getName() : urlOfItem);
-                    totalVisitPoint.addValue("views", Integer.valueOf(dataset.getMatrix()[0][i]));
-                    usageReportRest.addPoint(totalVisitPoint);
-                }
-            }
-        }
-        usageReportRest.setReportType(TOTAL_VISITS_REPORT_ID);
-        return usageReportRest;
-    }
-
     private UsageReportRest resolveTopItemsPageviewsReport(Context context, DSpaceObject dso)
         throws SQLException, IOException, ParseException, SolrServerException {
         StatisticsListing statListing = new StatisticsListing(new StatisticsDataVisits(dso));
@@ -328,6 +279,7 @@ public class UsageReportUtils {
         usageReportRest.setReportType(TOP_ITEMS_DOWNLOADS_REPORT_ID);
         return usageReportRest;
     }
+
     public long getTotalNumberOfPageviews(DSpaceObject dso) throws SolrServerException, IOException {
         String dsoid = dso.getID().toString();
         String filterQuery = "-isBot:true AND -(statistics_type:[* TO *] AND -statistics_type:view)";
@@ -506,6 +458,7 @@ public class UsageReportUtils {
 
         return usageReportRest;
     }
+
     private UsageReportRest resolveTotalDownloadsPerMonth(Context context, DSpaceObject dso)
         throws SQLException, IOException, ParseException, SolrServerException {
 
@@ -767,7 +720,7 @@ public class UsageReportUtils {
         for (FacetField fieldFacet: fieldFacets) {
             if (fieldFacet.getName().equalsIgnoreCase("city")) {
                 for (int i = 0; i < fieldFacet.getValues().size(); i++) {
-                    UsageReportPointCountryRest cityPoint = new UsageReportPointCountryRest();
+                    UsageReportPointCityRest cityPoint = new UsageReportPointCityRest();
                     cityPoint.setId(fieldFacet.getValues().get(i).getName());
                     cityPoint.setLabel(LocationUtils.getCountryName(fieldFacet.getValues().get(i).getName(), context.getCurrentLocale()));
                     cityPoint.addValue("views", (int) fieldFacet.getValues().get(i).getCount());
@@ -814,11 +767,11 @@ public class UsageReportUtils {
         for (FacetField fieldFacet: fieldFacets) {
             if (fieldFacet.getName().equalsIgnoreCase("city")) {
                 for (int i = 0; i < fieldFacet.getValues().size(); i++) {
-                    UsageReportPointCountryRest countryPoint = new UsageReportPointCountryRest();
-                    countryPoint.setId(fieldFacet.getValues().get(i).getName());
-                    countryPoint.setLabel(LocationUtils.getCountryName(fieldFacet.getValues().get(i).getName(), context.getCurrentLocale()));
-                    countryPoint.addValue("views", (int) fieldFacet.getValues().get(i).getCount());
-                    usageReportRest.addPoint(countryPoint);
+                    UsageReportPointCityRest cityPoint = new UsageReportPointCityRest();
+                    cityPoint.setId(fieldFacet.getValues().get(i).getName());
+                    cityPoint.setLabel(LocationUtils.getCountryName(fieldFacet.getValues().get(i).getName(), context.getCurrentLocale()));
+                    cityPoint.addValue("views", (int) fieldFacet.getValues().get(i).getCount());
+                    usageReportRest.addPoint(cityPoint);
                 }
             }
         }

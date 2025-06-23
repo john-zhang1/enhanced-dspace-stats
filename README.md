@@ -44,7 +44,11 @@ These enhancements allow stakeholders to track usage trends, discover geographic
    - Backend (Java): Replace or update relevant classes in your DSpace.
    - Frontend (Angular): Replace/update component files in `dspace-angular`.
 
-3. **Rebuild your DSpace environment**
+3. **Use textual version or graphical version:**
+   - Add parameter `useStatsCharts: true` to config.prod.yml for graphical version
+   - By default the textual version is used.
+
+4. **Rebuild your DSpace environment**
    Follow DSpace's standard rebuild procedures:
    ```bash
    # Backend
@@ -55,15 +59,17 @@ These enhancements allow stakeholders to track usage trends, discover geographic
    cd dspace-angular/
    yarn build:prod
 
-4. **Restart your DSpace services**
+5. **Restart your DSpace services**
 
 ---
 
 ## 🖼️ Screenshots
+![Total views per month Statistics](screenshots/totalviewschart.png)
+![Views per month chart Statistics](screenshots/viewslinechart.png)
 ![Pageviews per month Statistics](screenshots/viewspermonth.png)
-![Items with most pageviews](screenshots/itemswithmostviews.png)
+![Downloads by country map Statistics](screenshots/downloadsbycountrym.png)
+![Downloads by country](screenshots/downloadsbycountryt.png)
 ![Items with most downloads](screenshots/itemswithmostviews.png)
-![Downloads by country](screenshots/downloadsbycountry.png)
 
 ⸻
 

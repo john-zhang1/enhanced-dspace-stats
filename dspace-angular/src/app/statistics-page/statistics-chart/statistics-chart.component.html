@@ -1,0 +1,184 @@
+<div class="flex-container2">
+  <div class="row">
+    <div class="flex-item flex-item-1 icon-box">
+      <div class="chart-container">
+        <canvas id="totalViewsDoughnut"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="flex-item flex-item-2 icon-box">
+      <canvas id="viewsPerMonthLine" width="500" height="200"></canvas>
+    </div>
+  </div>
+  <div class="row">
+    <div class="flex-item_table icon-box">
+      <h2 class="table-title">Pageviews and downloads over the past 6 months</h2>
+      <div class="table-header">
+        <div class="header-cell title-cell">
+          Month
+        </div>
+        <div class="header-cell pageviews-cell">
+          Pageviews
+        </div>
+        <div class="header-cell pageviews-cell">
+          Downloads
+        </div>
+      </div>
+      <div class="table-body">
+        <div class="table-row" *ngFor="let item of labelViewsPerMonthLine; let i = index">
+          <div class="table-cell title-cell">{{ item }}</div>
+          <div class="table-cell pageviews-cell">{{ formatNumber(viewsPerMonthPageviews[i]) }}</div>
+          <div class="table-cell pageviews-cell">{{ formatNumber(viewsPerMonthDownloads[i]) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<ng-container *ngIf="!countryData">
+  <ds-themed-loading></ds-themed-loading>
+</ng-container>
+<div class="row icon-box">
+  <div>
+    <h2 class="map-title">Downloads by country</h2><span>(Click on the countries on the map to view the data.)</span>
+  </div>
+  <div class="map-container">
+    <div id="map" class="map"></div>
+  </div>
+</div>
+
+<div class="flex-container_table">
+  <div class="row">
+    <div class="flex-item_table icon-box">
+      <h2 class="table-title">Downloads by country</h2>
+      <div class="table-header">
+        <div class="header-cell2 country-cell">
+          Country
+        </div>
+        <div class="header-cell2 downloads-cell">
+          Downloads
+        </div>
+        <div class="header-cell2 country-cell">
+          Country
+        </div>
+        <div class="header-cell2 downloads-cell">
+          Downloads
+        </div>
+      </div>
+      <ng-container *ngIf="!countryTableData">
+        <ds-themed-loading></ds-themed-loading>
+      </ng-container>
+      <div class="table-body">
+        <div class="table-row" *ngFor="let row of countryTableData">
+          <div class="table-cell2 country-cell">{{row.country1}}</div>
+          <div class="table-cell2 downloads-cell">{{formatNumber(row.downloads1)}}</div>
+          <div class="table-cell2 country-cell">{{row.country2}}</div>
+          <div class="table-cell2 downloads-cell">{{formatNumber(row.downloads2)}}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="flex-container_table">
+  <div class="row">
+    <div class="flex-item_table icon-box">
+      <h2 class="table-title">Downloads by city</h2>
+      <div class="table-header">
+        <div class="header-cell2 country-cell">
+          City
+        </div>
+        <div class="header-cell2 downloads-cell">
+          Downloads
+        </div>
+        <div class="header-cell2 country-cell">
+          City
+        </div>
+        <div class="header-cell2 downloads-cell">
+          Downloads
+        </div>
+      </div>
+      <ng-container *ngIf="!cityTableData">
+        <ds-themed-loading></ds-themed-loading>
+      </ng-container>
+      <div class="table-body">
+        <div class="table-row" *ngFor="let row of cityTableData">
+          <div class="table-cell2 country-cell">{{row.city1}}</div>
+          <div class="table-cell2 downloads-cell">{{formatNumber(row.downloads1)}}</div>
+          <div class="table-cell2 country-cell">{{row.city2}}</div>
+          <div class="table-cell2 downloads-cell">{{formatNumber(row.downloads2)}}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="scope.type==='site' || scope.type==='community' || scope.type==='collection'">
+  <div class="flex-container_table">
+    <div class="row">
+      <div class="flex-item_table icon-box">
+        <h2 class="table-title">Top 10 Items with the Most Pageviews</h2>
+        <div class="table-header">
+          <div class="header-cell title-cell">
+            Title
+          </div>
+          <div class="header-cell author-cell">
+            Author
+          </div>
+          <div class="header-cell pageviews-cell">
+            Pageviews
+          </div>
+        </div>
+        <div class="table-body">
+          <div class="table-row" *ngFor="let item of itempageviews">
+            <div class="table-cell title-cell"><a [routerLink]="['/items', item.id]">{{ truncateString((getLabel(item.id) | async), 75) }}</a></div>
+            <ng-container *ngVar="(getItem(item.id) | async)?.firstMetadataValue(['dc.contributor.author']) as authorName">
+              <div class="table-cell author-cell">
+                <a [routerLink]="['/search']"
+                   [queryParams]="{
+                     'f.author': authorName + ',equals',
+                     'spc.page': '1'
+                   }">
+                {{ authorName }}
+                </a>
+              </div>  
+            </ng-container>
+            <div class="table-cell pageviews-cell">{{ item.values['views'] | number }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="flex-item_table icon-box">
+        <h2 class="table-title">Top 10 Items with the Most File Downloads</h2>
+        <div class="table-header">
+          <div class="header-cell title-cell">
+            Title
+          </div>
+          <div class="header-cell author-cell">
+            Author
+          </div>
+          <div class="header-cell pageviews-cell">
+            Downloads
+          </div>
+        </div>
+        <div class="table-body">
+          <div class="table-row" *ngFor="let item of itemdownloads">
+            <div class="table-cell title-cell"><a [routerLink]="['/items', item.id]">{{ truncateString((getLabel(item.id) | async), 75) }}</a></div>
+            <ng-container *ngVar="(getItem(item.id) | async)?.firstMetadataValue(['dc.contributor.author']) as authorName">
+              <div class="table-cell author-cell">
+                <a [routerLink]="['/search']"
+                   [queryParams]="{
+                     'f.author': authorName + ',equals',
+                     'spc.page': '1'
+                   }">
+                {{ authorName }}
+                </a>
+              </div>
+            </ng-container>
+            <div class="table-cell pageviews-cell">{{ item.values['views'] | number }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
